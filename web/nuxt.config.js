@@ -1,9 +1,5 @@
 require('dotenv').config({ path: '../.env' })
 
-function isDevelopment() {
-  return process.env.ENVIRONMENT !== 'production'
-}
-
 export default {
   server: {
     host: process.env.HTTP_HOST,
@@ -30,8 +26,8 @@ export default {
       { name: 'theme-color', content: '#1e90ff' },
       { name: 'og:title', content: 'ModMail' },
       { name: 'og:type', content: 'website' },
-      { name: 'og:url', content: `${process.env.BASE_URI}` },
-      { name: 'og:image', content: `${process.env.BASE_URI}/icon.png` },
+      { name: 'og:url', content: 'https://modmail.xyz' },
+      { name: 'og:image', content: 'https://modmail.xyz/icon.png' },
       { name: 'og:site_name', content: 'ModMail' },
       {
         name: 'og:description',
@@ -40,7 +36,7 @@ export default {
       },
       { name: 'twitter:card', content: 'summary' },
       { name: 'twitter:title', content: 'ModMail' },
-      { name: 'twitter:image', content: `${process.env.BASE_URI}/icon.png` },
+      { name: 'twitter:image', content: 'https://modmail.xyz/icon.png' },
       {
         name: 'twitter:description',
         content:
@@ -54,11 +50,12 @@ export default {
       { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
       { rel: 'mask-icon', href: '/safari-pinned-tab.svg', color: '#ff4500' },
       { rel: 'manifest', href: '/site.webmanifest' },
-      { rel: 'canonical', href: `${process.env.BASE_URI}` },
+      { rel: 'canonical', href: 'https://modmail.xyz' },
     ],
   },
 
   build: {
+    postcss: process.env.NODE_ENV === 'production' ? {} : null,
     optimizeCSS: true,
     babel: {
       compact: true,
@@ -72,7 +69,7 @@ export default {
 
   components: true,
 
-  dev: isDevelopment(),
+  dev: process.env.NODE_ENV !== 'production',
 
   loading: {
     color: 'dodgerblue',
@@ -89,18 +86,11 @@ export default {
     '~/plugins/modal.js',
   ],
 
-  modules: [
-    '@nuxt/content',
-    '@nuxtjs/axios',
-    '@nuxtjs/proxy',
-    '@nuxtjs/sentry',
-    'bootstrap-vue/nuxt',
-  ],
+  modules: ['@nuxt/content', '@nuxtjs/axios', '@nuxtjs/proxy', 'bootstrap-vue/nuxt'],
 
   buildModules: [
     '@nuxtjs/eslint-module',
     '@nuxtjs/fontawesome',
-    '@nuxtjs/google-analytics',
     '@nuxtjs/pwa',
     '@nuxtjs/stylelint-module',
     '@nuxtjs/style-resources',
@@ -116,20 +106,21 @@ export default {
   },
 
   axios: {
-    baseURL: `${process.env.BASE_URI}/api`,
+    baseURL: '/api',
     credentials: true,
     headers: {
       'Cache-Control': 'max-age=0',
     },
   },
 
-  proxy: {
-    '/api': `http://${process.env.API_HOST}:${process.env.API_PORT}`,
+  publicRuntimeConfig: {
+    axios: {
+      baseURL: `${process.env.BASE_URI}/api`,
+    },
   },
 
-  sentry: {
-    disabled: isDevelopment(),
-    dsn: process.env.SENTRY_DSN,
+  proxy: {
+    '/api': `http://${process.env.API_HOST}:${process.env.API_PORT}`,
   },
 
   bootstrapVue: {
@@ -149,11 +140,6 @@ export default {
       solid: ['faCircle', 'faGlobe'],
       brands: ['faGithub', 'faLinkedin', 'faReddit', 'faTwitter'],
     },
-  },
-
-  googleAnalytics: {
-    dev: isDevelopment(),
-    id: process.env.GOOGLE_ANALYTICS,
   },
 
   pwa: {

@@ -20,7 +20,7 @@ from classes.message import Message
 from utils import tools
 from utils.config import Config
 
-VERSION = "3.1.0"
+VERSION = "3.3.0"
 
 
 class Instance:
@@ -144,12 +144,6 @@ class Scheduler:
                 f"https://bots.ondiscord.xyz/bot-api/bots/{self.bot.id}/guilds",
                 data=orjson.dumps({"guildCount": guilds}),
                 headers={"Authorization": config.BOD_TOKEN, "Content-Type": "application/json"},
-            )
-
-            await self.session.post(
-                f"https://botsfordiscord.com/api/bot/{self.bot.id}",
-                data=orjson.dumps({"server_count": guilds}),
-                headers={"Authorization": config.BFD_TOKEN, "Content-Type": "application/json"},
             )
 
             await asyncio.sleep(900)
@@ -297,14 +291,6 @@ class Main:
         self.bot.id = (await self.bot.real_user()).id
         self.bot.state.id = self.bot.id
 
-        async with self.bot.pool.acquire() as conn:
-            exists = await conn.fetchrow(
-                "SELECT EXISTS (SELECT relname FROM pg_class WHERE relname = 'data')"
-            )
-            if exists[0] is False:
-                with open("schema.sql", "r") as file:
-                    await conn.execute(file.read())
-
         for i in range(int(config.BOT_CLUSTERS)):
             self.instances.append(Instance(i + 1, loop=self.loop, main=self))
 
@@ -322,7 +308,8 @@ class Main:
 
 config = Config().load()
 
-loop = asyncio.get_event_loop()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 main = Main(loop=loop)
 loop.create_task(main.launch())
 

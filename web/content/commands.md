@@ -33,9 +33,16 @@ Set or clear the roles mentioned when a ticket is opened. You can also use `ever
 
 ## logging
 
-Toggle between enable and disable for ModMail logs.
+Toggle ticket logging and optionally in an existing channel.
 
+- Usage: `[channel]`
 - Alias: logs
+
+## commandonly
+
+Toggle whether commands are required to reply to a ticket.
+
+- Alias: commandrequired
 
 ## greetingmessage
 
@@ -62,6 +69,13 @@ Toggle advanced logging which includes messages sent and received.
 ## anonymous
 
 Toggle default anonymous messages.
+
+## toggle
+
+Toggle whether tickets can be created, optionally with reason if disabling.
+
+- Usage: `[reason]`
+- Alias: enable, disable
 
 ## viewconfig
 

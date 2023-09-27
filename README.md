@@ -5,7 +5,7 @@
 
 A feature-rich Discord bot for easy communication between server staff and users.
 
-![Screenshot](https://chamburr.xyz/u/7PUf0Z.png)
+![Screenshot](https://user-images.githubusercontent.com/42373024/194307657-9a146d26-c5ac-4138-8428-a78d2cacf6a6.png)
 
 A new channel is created whenever a user messages the bot, and the channel will serve as a shared
 inbox for seamless communication between staff and the user.
@@ -27,11 +27,23 @@ question. Instead, ask it on our [Discord server][discord].
 
 ## Self-hosting
 
-Due to the complex infrastructure, the bot is unfortunately not suitable to for self-hosting at the
-moment. Please use our public instance while we are working on a way to run the bot with Docker.
+This guide requires you to have basic knowledge about command line, Docker and Discord bots. We
+will not provide any form of support for self-hosting.
 
-Alternatively, you may also host [v2.x](https://github.com/chamburr/modmail/tree/v2.1.2) of this
-bot. There are self-hosting instructions on the README page of those versions.
+First, create a Discord bot on the [developer portal](https://discord.com/developers). You must
+enable the server member intent and the message content intent for the bot to function.
+
+Then, install Git and Docker on your machine. Clone this repository, copy `docker/.env.example` to
+`docker/.env` and fill in all the configurations.
+
+Finally, use the following commands run ModMail.
+
+```
+cd docker
+docker-compose up -d
+```
+
+Your self-hosted bot should be up now. Congratulations!
 
 ## License
 

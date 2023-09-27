@@ -2,16 +2,11 @@ import asyncio
 import logging
 import sys
 
-import sentry_sdk
-
 from classes.bot import ModMail
 from utils import tools
 from utils.config import Config
 
 config = Config().load()
-
-if config.ENVIRONMENT == "production":
-    sentry_sdk.init(config.SENTRY_DSN)
 
 cluster_id = int(sys.argv[1])
 cluster_count = int(sys.argv[2])
@@ -33,6 +28,10 @@ async def command_prefix(bot2, message):
     return [f"<@{bot.id}> ", f"<@!{bot.id}> ", prefix]
 
 
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+
 bot = ModMail(
     command_prefix=command_prefix,
     bot_id=bot_id,
@@ -47,5 +46,4 @@ async def on_message(_):
     pass
 
 
-loop = asyncio.get_event_loop()
 loop.run_until_complete(bot.start())

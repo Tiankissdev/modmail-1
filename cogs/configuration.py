@@ -1,4 +1,5 @@
 import logging
+import typing
 
 from discord.errors import Forbidden
 from discord.ext import commands
@@ -7,7 +8,7 @@ from discord.role import Role
 
 from classes.embed import Embed, ErrorEmbed
 from utils import checks, tools
-from utils.converters import PingRoleConverter, RoleConverter
+from utils.converters import ChannelConverter, PingRoleConverter, RoleConverter
 
 log = logging.getLogger(__name__)
 
@@ -264,26 +265,18 @@ class Configuration(commands.Cog):
     @checks.has_permissions(administrator=True)
     @commands.guild_only()
     @commands.command(
-        description="Toggle between enable and disable for ModMail logs.",
+        description="Toggle ticket logging and optionally in an existing channel.",
         aliases=["logs"],
-        usage="logging",
+        usage="logging [channel]",
     )
-    async def logging(self, ctx):
+    async def logging(self, ctx, channel: typing.Optional[ChannelConverter]):
         data = await tools.get_data(self.bot, ctx.guild.id)
-        channel = await ctx.guild.get_channel(data[4])
 
-        if channel:
-            try:
-                await channel.delete()
-            except Forbidden:
-                await ctx.send(ErrorEmbed("Missing permissions to delete the channel."))
-                return
-
-        if data[4]:
+        if data[4] and channel is None:
             async with self.bot.pool.acquire() as conn:
                 await conn.execute("UPDATE data SET logging=$1 WHERE guild=$2", None, ctx.guild.id)
 
-            await ctx.send(Embed("ModMail logs are disabled."))
+            await ctx.send(Embed("ModMail logging is disabled. You may delete the channel."))
             return
 
         category = await ctx.guild.get_channel(data[2])
@@ -296,14 +289,37 @@ class Configuration(commands.Cog):
             )
             return
 
-        channel = await ctx.guild.create_text_channel(name="modmail-log", category=category)
+        if channel is None:
+            channel = await ctx.guild.create_text_channel(name="modmail-log", category=category)
 
         async with self.bot.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE data SET logging=$1 WHERE guild=$2", channel.id, ctx.guild.id
             )
 
-        await ctx.send(Embed("The channel is created successfully."))
+        await ctx.send(Embed("ModMail logging is enabled."))
+
+    @checks.in_database()
+    @checks.has_permissions(administrator=True)
+    @commands.guild_only()
+    @commands.command(
+        description="Toggle whether commands are required to reply to a ticket.",
+        aliases=["commandrequired"],
+        usage="commandonly",
+    )
+    async def commandonly(self, ctx):
+        data = await tools.get_data(self.bot, ctx.guild.id)
+
+        async with self.bot.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE data SET commandonly=$1 WHERE guild=$2",
+                True if data[11] is False else False,
+                ctx.guild.id,
+            )
+
+        await ctx.send(
+            Embed(f"Command only mode is {'enabled' if data[11] is False else 'disabled'}.")
+        )
 
     @checks.in_database()
     @checks.is_premium()
@@ -382,25 +398,53 @@ class Configuration(commands.Cog):
     @checks.has_permissions(administrator=True)
     @commands.guild_only()
     @commands.command(
+        description="Toggle whether tickets can be created, optionally with reason if disabling.",
+        aliases=["enable", "disable"],
+        usage="toggle [reason]",
+    )
+    async def toggle(self, ctx, *, reason: str = ""):
+        data = await tools.get_data(self.bot, ctx.guild.id)
+
+        async with self.bot.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE data SET toggle=$1 WHERE guild=$2",
+                reason if data[12] is None else None,
+                ctx.guild.id,
+            )
+
+        await ctx.send(
+            Embed(f"Ticket creation is {'disabled' if data[12] is None else 'enabled'}.")
+        )
+
+    @checks.in_database()
+    @checks.has_permissions(administrator=True)
+    @commands.guild_only()
+    @commands.command(
         description="View the configurations for the current server.", usage="viewconfig"
     )
     async def viewconfig(self, ctx):
         data = await tools.get_data(self.bot, ctx.guild.id)
         category = await ctx.guild.get_channel(data[2])
-        logging_channel = await ctx.guild.get_channel(data[4])
+        logging = await ctx.guild.get_channel(data[4])
 
-        access_roles = []
+        access = []
         for role in data[3]:
-            access_roles.append(f"<@&{role}>")
+            access.append(f"<@&{role}>")
 
-        ping_roles = []
+        ping = []
         for role in data[8]:
             if role == -1:
-                ping_roles.append("@here")
+                ping.append("@here")
             elif role == ctx.guild.id:
-                ping_roles.append("@everyone")
+                ping.append("@everyone")
             else:
-                ping_roles.append(f"<@&{role}>")
+                ping.append(f"<@&{role}>")
+
+        toggle = data[12]
+        if toggle and len(toggle) > 989:
+            toggle = toggle[:986] + "..."
+        elif toggle == "":
+            toggle = "No reason was provided."
 
         greeting = data[5]
         if greeting and len(greeting) > 1000:
@@ -413,19 +457,15 @@ class Configuration(commands.Cog):
         embed = Embed(title="Server Configurations")
         embed.add_field("Prefix", ctx.prefix)
         embed.add_field("Category", "*Not set*" if category is None else category.name)
-        embed.add_field(
-            "Access Roles",
-            "*Not set*" if len(access_roles) == 0 else " ".join(access_roles),
-        )
-        embed.add_field("Ping Roles", "*Not set*" if len(ping_roles) == 0 else " ".join(ping_roles))
-        embed.add_field(
-            "Logging",
-            "*Not set*" if logging_channel is None else f"<#{logging_channel.id}>",
-        )
+        embed.add_field("Access Roles", "*Not set*" if len(access) == 0 else " ".join(access))
+        embed.add_field("Ping Roles", "*Not set*" if len(ping) == 0 else " ".join(ping))
+        embed.add_field("Logging", "*Not set*" if logging is None else f"<#{logging.id}>")
         embed.add_field("Advanced Logging", "Enabled" if data[7] is True else "Disabled")
         embed.add_field("Anonymous Messaging", "Enabled" if data[10] is True else "Disabled")
+        embed.add_field("Command Only", "Enabled" if data[11] is True else "Disabled")
+        embed.add_field("Ticket Creation", "Enabled" if toggle is None else f"Disabled ({toggle})")
         embed.add_field("Greeting Message", "*Not set*" if greeting is None else greeting, False)
-        embed.add_field("Closing message", "*Not set*" if closing is None else closing, False)
+        embed.add_field("Closing Message", "*Not set*" if closing is None else closing, False)
 
         await ctx.send(embed)
 

@@ -59,6 +59,16 @@ class DirectMessageEvents(commands.Cog, name="Direct Message"):
                 break
 
         if channel is None:
+            if data[12] is not None:
+                embed = ErrorEmbed(
+                    "Ticket Creation Disabled",
+                    data[12] if data[12] else "No reason was provided.",
+                    timestamp=True,
+                )
+                embed.set_footer(f"{guild.name} | {guild.id}", guild.icon_url)
+                await message.channel.send(embed)
+                return
+
             self.bot.prom.tickets.inc({})
 
             name = "".join(
@@ -82,13 +92,29 @@ class DirectMessageEvents(commands.Cog, name="Direct Message"):
                     "not change this)",
                 )
             except discord.HTTPException as e:
-                await message.channel.send(
-                    ErrorEmbed(
-                        "An HTTPException error occurred. Please contact an admin on the server "
-                        f"with the following information: {e.text} ({e.code})."
+                if "Contains words not allowed" in e.text:
+                    channel = await guild.create_text_channel(
+                        name=message.author.id,
+                        category=category,
+                        topic=f"ModMail Channel {message.author.id} {message.channel.id} (Please "
+                        "do not change this)",
                     )
-                )
-                return
+                elif "Maximum number of channels" in e.text:
+                    await message.channel.send(
+                        ErrorEmbed(
+                            "The server has reached the maximum number of active tickets. Please "
+                            "try again later."
+                        )
+                    )
+                    return
+                else:
+                    await message.channel.send(
+                        ErrorEmbed(
+                            "An HTTPException error occurred. Please contact an admin on the "
+                            f"server with the following information: {e.text} ({e.code})."
+                        )
+                    )
+                    return
 
             log_channel = await guild.get_channel(data[4])
             if log_channel:
@@ -117,6 +143,14 @@ class DirectMessageEvents(commands.Cog, name="Direct Message"):
                 f"`{prefix}close [reason]` to close this ticket.",
                 timestamp=True,
             )
+
+            if data[11]:
+                embed.description = (
+                    f"Type `{prefix}reply <message>` in this channel to reply. All other messages "
+                    "are ignored, and can be used for staff discussion. Use the command "
+                    f"`{prefix}close [reason]` to close this ticket. (Command only mode enabled)"
+                )
+
             embed.add_field("User", f"<@{message.author.id}> ({message.author.id})")
             embed.add_field(
                 "Roles",
@@ -299,18 +333,23 @@ class DirectMessageEvents(commands.Cog, name="Direct Message"):
             return
 
         guild = None
-        async for msg in message.channel.history(limit=30):
-            if (
-                msg.author.id == self.bot.id
-                and len(msg.embeds) > 0
-                and msg.embeds[0].title in ["Message Received", "Message Sent"]
-            ):
-                guild = msg.embeds[0].footer.text.split()[-1]
-                guild = await self.bot.get_guild(int(guild))
-                break
+        confirmation = False
+        if self.bot.config.DEFAULT_SERVER is not None:
+            guild = await self.bot.get_guild(int(self.bot.config.DEFAULT_SERVER))
+        else:
+            async for msg in message.channel.history(limit=30):
+                if (
+                    msg.author.id == self.bot.id
+                    and len(msg.embeds) > 0
+                    and msg.embeds[0].title in ["Message Received", "Message Sent"]
+                ):
+                    guild = msg.embeds[0].footer.text.split()[-1]
+                    guild = await self.bot.get_guild(int(guild))
+                    break
 
-        settings = await tools.get_user_settings(self.bot, message.author.id)
-        confirmation = True if settings is None or settings[0] is True else False
+            settings = await tools.get_user_settings(self.bot, message.author.id)
+            if settings is None or settings[0] is True:
+                confirmation = True
 
         if guild and confirmation is True:
             embed = Embed(
